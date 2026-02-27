@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KeyVault — License Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --surface2: #161b22;
+    --border: #21262d;
+    --accent: #00ff88;
+    --accent2: #00bfff;
+    --danger: #ff4757;
+    --warn: #ffa502;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --radius: 6px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100%;
+    font-size: 13px;
+  }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0,255,136,0.07) 0%, transparent 60%);
+  }
+  .login-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 48px 40px;
+    width: 380px;
+    text-align: center;
+  }
+  .login-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -1px;
+    margin-bottom: 6px;
+  }
+  .login-sub { color: var(--muted); margin-bottom: 36px; font-size: 12px; }
+  .login-box input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 12px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    margin-bottom: 12px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .login-box input:focus { border-color: var(--accent); }
+  .btn-primary {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn-primary:hover { opacity: .9; }
+  .btn-primary:active { transform: scale(.98); }
+  .login-error { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* ── LAYOUT ── */
+  #app { display: none; min-height: 100vh; }
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .topbar-logo span { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 8px; font-family: 'JetBrains Mono'; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .stat-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .stat-pill b { color: var(--accent); }
+
+  /* ── MAIN ── */
+  .main { padding: 28px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 9px 14px 9px 36px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+  .btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 14px;
+    border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn-green {
+    background: rgba(0,255,136,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .btn-green:hover { background: rgba(0,255,136,0.2); }
+
+  /* ── TABLE ── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface2); }
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .key-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent2);
+    cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  .key-value:hover { color: var(--accent); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .badge-active { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .badge-disabled { background: rgba(255,71,87,0.1); color: var(--danger); border: 1px solid rgba(255,71,87,0.3); }
+  .badge-expired { background: rgba(255,165,2,0.1); color: var(--warn); border: 1px solid rgba(255,165,2,0.3); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .dot-pulse { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .hwid-cell { color: var(--muted); font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .last-seen { color: var(--muted); font-size: 11px; }
+
+  .actions { display: flex; gap: 6px; }
+  .action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .action-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .action-btn.warn:hover { border-color: var(--warn); color: var(--warn); }
+
+  .empty-state {
+    padding: 60px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty-state h3 { font-family: 'Syne', sans-serif; font-size: 18px; margin-bottom: 8px; color: var(--text); }
+
+  /* ── MODAL ── */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    width: 460px;
+    max-width: 95vw;
+    position: relative;
+  }
+  .modal h2 { font-family: 'Syne', sans-serif; font-size: 18px; margin-bottom: 20px; }
+  .modal label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .modal input, .modal select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color .2s;
+  }
+  .modal input:focus, .modal select:focus { border-color: var(--accent); }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+  .modal-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── TOAST ── */
+  .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    font-size: 12px;
+    min-width: 200px;
+    animation: slideIn .2s ease;
+  }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── LOADING ── */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-row td { padding: 40px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">⬡ KeyVault</div>
+    <div class="login-sub">License Management System</div>
+    <input type="password" id="pwd-input" placeholder="Dashboard password" autocomplete="current-password"/>
+    <button class="btn-primary" onclick="doLogin()">Access Dashboard</button>
+    <div class="login-error" id="login-error">Invalid password</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">⬡ KeyVault <span>License Management</span></div>
+    <div class="topbar-right">
+      <div class="stat-pill">Total: <b id="stat-total">—</b></div>
+      <div class="stat-pill">Active: <b id="stat-active" style="color:var(--green)">—</b></div>
+      <div class="stat-pill">Expired: <b id="stat-expired" style="color:var(--warn)">—</b></div>
+      <button class="btn" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="search" placeholder="Search keys, labels, HWID..." oninput="renderTable()"/>
+      </div>
+      <button class="btn" onclick="loadKeys()">↻ Refresh</button>
+      <button class="btn btn-green" onclick="openCreateModal()">+ New Key</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Label</th>
+            <th>Status</th>
+            <th>HWID</th>
+            <th>Expires</th>
+            <th>Last Seen</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="keys-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal-bg" id="create-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('create-modal')">✕</button>
+    <h2>Create New Key</h2>
+    <label>Label (optional)</label>
+    <input type="text" id="new-label" placeholder="e.g. Pro User — John"/>
+    <label>Expires At (optional)</label>
+    <input type="datetime-local" id="new-expires"/>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('create-modal')">Cancel</button>
+      <button class="btn btn-green" onclick="createKey()">Generate Key</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-bg" id="edit-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('edit-modal')">✕</button>
+    <h2>Edit Key</h2>
+    <input type="hidden" id="edit-id"/>
+    <label>Label</label>
+    <input type="text" id="edit-label" placeholder="Label"/>
+    <label>Reset HWID (leave blank to keep current)</label>
+    <input type="text" id="edit-hwid" placeholder="Leave blank to keep, type CLEAR to remove"/>
+    <label>Expires At</label>
+    <input type="datetime-local" id="edit-expires"/>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('edit-modal')">Cancel</button>
+      <button class="btn btn-green" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+const API = '';
+let password = '';
+let allKeys = [];
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function doLogin() {
+  password = document.getElementById('pwd-input').value;
+  if (!password) return;
+  fetch(`${API}/api/keys`, { headers: { 'x-dashboard-password': password } })
+    .then(r => {
+      if (!r.ok) throw new Error();
+      return r.json();
+    })
+    .then(keys => {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      allKeys = keys;
+      renderTable();
+      updateStats();
+    })
+    .catch(() => {
+      document.getElementById('login-error').style.display = 'block';
+    });
+}
+
+function logout() {
+  password = '';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+document.getElementById('pwd-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'x-dashboard-password': password };
+}
+
+function loadKeys() {
+  const tbody = document.getElementById('keys-tbody');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><div class="spinner"></div></td></tr>';
+  fetch(`${API}/api/keys`, { headers: authHeaders() })
+    .then(r => r.json())
+    .then(keys => {
+      allKeys = keys;
+      renderTable();
+      updateStats();
+    });
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const now = new Date();
+  const total = allKeys.length;
+  const active = allKeys.filter(k => k.enabled && (!k.expires_at || new Date(k.expires_at) > now)).length;
+  const expired = allKeys.filter(k => k.expires_at && new Date(k.expires_at) <= now).length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-active').textContent = active;
+  document.getElementById('stat-expired').textContent = expired;
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function getStatus(k) {
+  const now = new Date();
+  if (k.expires_at && new Date(k.expires_at) <= now) return 'expired';
+  if (!k.enabled) return 'disabled';
+  return 'active';
+}
+
+function formatDate(d) {
+  if (!d) return '<span style="color:var(--muted)">Never</span>';
+  const dt = new Date(d);
+  return dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function timeAgo(d) {
+  if (!d) return '<span style="color:var(--muted)">—</span>';
+  const sec = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec/60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec/3600)}h ago`;
+  return `${Math.floor(sec/86400)}d ago`;
+}
+
+function renderTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = allKeys.filter(k =>
+    k.key.toLowerCase().includes(q) ||
+    (k.label || '').toLowerCase().includes(q) ||
+    (k.hwid || '').toLowerCase().includes(q)
+  );
+
+  const tbody = document.getElementById('keys-tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state">
+        <h3>${allKeys.length === 0 ? 'No keys yet' : 'No results'}</h3>
+        <p>${allKeys.length === 0 ? 'Create your first key with the button above.' : 'Try a different search.'}</p>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(k => {
+    const status = getStatus(k);
+    const badgeClass = { active: 'badge-active', disabled: 'badge-disabled', expired: 'badge-expired' }[status];
+    const badgeLabel = { active: 'ACTIVE', disabled: 'DISABLED', expired: 'EXPIRED' }[status];
+    const isPulsing = status === 'active' && k.last_seen && (Date.now() - new Date(k.last_seen)) < 60000;
+
+    return `<tr>
+      <td><span class="key-value" onclick="copyKey('${k.key}')" title="Click to copy">${k.key}</span></td>
+      <td style="color:var(--muted)">${k.label || '—'}</td>
+      <td><span class="badge ${badgeClass}"><span class="dot ${isPulsing ? 'dot-pulse' : ''}"></span>${badgeLabel}</span></td>
+      <td><div class="hwid-cell" title="${k.hwid || ''}">${k.hwid || '<span style="color:var(--muted)">—</span>'}</div></td>
+      <td class="last-seen">${formatDate(k.expires_at)}</td>
+      <td class="last-seen">${timeAgo(k.last_seen)}</td>
+      <td>
+        <div class="actions">
+          <button class="action-btn" onclick="openEditModal('${k.id}')">Edit</button>
+          <button class="action-btn ${k.enabled ? 'warn' : ''}" onclick="toggleKey('${k.id}', ${k.enabled})">${k.enabled ? 'Disable' : 'Enable'}</button>
+          <button class="action-btn danger" onclick="deleteKey('${k.id}')">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+function copyKey(key) {
+  navigator.clipboard.writeText(key).then(() => toast('Key copied to clipboard', 'success'));
+}
+
+function openCreateModal() {
+  document.getElementById('new-label').value = '';
+  document.getElementById('new-expires').value = '';
+  document.getElementById('create-modal').classList.add('show');
+}
+
+function createKey() {
+  const label = document.getElementById('new-label').value;
+  const expires_at = document.getElementById('new-expires').value;
+  fetch(`${API}/api/keys`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ label, expires_at: expires_at ? new Date(expires_at).toISOString() : null })
+  }).then(r => r.json()).then(k => {
+    allKeys.unshift(k);
+    renderTable();
+    updateStats();
+    closeModal('create-modal');
+    toast(`Key created: ${k.key}`, 'success');
+  });
+}
+
+function openEditModal(id) {
+  const k = allKeys.find(x => x.id === id);
+  if (!k) return;
+  document.getElementById('edit-id').value = k.id;
+  document.getElementById('edit-label').value = k.label || '';
+  document.getElementById('edit-hwid').value = '';
+  if (k.expires_at) {
+    const dt = new Date(k.expires_at);
+    document.getElementById('edit-expires').value = dt.toISOString().slice(0, 16);
+  } else {
+    document.getElementById('edit-expires').value = '';
+  }
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function saveEdit() {
+  const id = document.getElementById('edit-id').value;
+  const label = document.getElementById('edit-label').value;
+  const hwidInput = document.getElementById('edit-hwid').value.trim();
+  const expires = document.getElementById('edit-expires').value;
+
+  const body = { label, expires_at: expires ? new Date(expires).toISOString() : '' };
+  if (hwidInput === 'CLEAR') body.hwid = '';
+  else if (hwidInput) body.hwid = hwidInput;
+
+  fetch(`${API}/api/keys/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  }).then(r => r.json()).then(updated => {
+    const idx = allKeys.findIndex(x => x.id === id);
+    if (idx !== -1) allKeys[idx] = updated;
+    renderTable();
+    updateStats();
+    closeModal('edit-modal');
+    toast('Key updated', 'success');
+  });
+}
+
+function toggleKey(id, currentlyEnabled) {
+  fetch(`${API}/api/keys/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ enabled: !currentlyEnabled })
+  }).then(r => r.json()).then(updated => {
+    const idx = allKeys.findIndex(x => x.id === id);
+    if (idx !== -1) allKeys[idx] = updated;
+    renderTable();
+    updateStats();
+    toast(`Key ${updated.enabled ? 'enabled' : 'disabled'}`, 'success');
+  });
+}
+
+function deleteKey(id) {
+  if (!confirm('Delete this key permanently?')) return;
+  fetch(`${API}/api/keys/${id}`, { method: 'DELETE', headers: authHeaders() })
+    .then(() => {
+      allKeys = allKeys.filter(x => x.id !== id);
+      renderTable();
+      updateStats();
+      toast('Key deleted', 'success');
+    });
+}
+
+// ── Modal helpers ──────────────────────────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+document.querySelectorAll('.modal-bg').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// Auto-refresh every 30s
+setInterval(() => { if (password) loadKeys(); }, 30000);
+</script>
+</body>
+</html>
