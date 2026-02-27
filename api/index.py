@@ -28,11 +28,13 @@ def supabase_request(method, table, filters=None, data=None):
 
     try:
         with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+            result = json.loads(resp.read())
+            return result, None
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
-        print(f"Supabase error {e.code}: {error_body}")
-        return []
+        return [], f"HTTP {e.code}: {error_body}"
+    except Exception as e:
+        return [], str(e)
 
 def generate_key():
     chars = string.ascii_letters + string.digits
@@ -75,8 +77,21 @@ class handler(BaseHTTPRequestHandler):
         if path == "/api/keys":
             if not check_auth(self):
                 return json_response(self, 401, {"detail": "Unauthorized"})
-            rows = supabase_request("GET", "keys", filters=["order=created_at.desc"])
+            rows, err = supabase_request("GET", "keys", filters=["order=created_at.desc"])
+            if err:
+                return json_response(self, 500, {"detail": "DB error", "error": err})
             return json_response(self, 200, rows)
+
+        # DEBUG - visit this in browser to diagnose
+        if path == "/api/debug":
+            rows, err = supabase_request("GET", "keys", filters=["order=created_at.desc"])
+            return json_response(self, 200, {
+                "supabase_url": SUPABASE_URL,
+                "key_prefix": SUPABASE_KEY[:25] + "..." if SUPABASE_KEY else "MISSING",
+                "rows_found": len(rows),
+                "error": err,
+                "rows": rows
+            })
 
         return json_response(self, 404, {"detail": "Not found"})
 
@@ -96,16 +111,32 @@ class handler(BaseHTTPRequestHandler):
                 "last_seen": None,
                 "active_hwid": None,
             }
-            rows = supabase_request("POST", "keys", data=data)
+            rows, err = supabase_request("POST", "keys", data=data)
+            if err:
+                return json_response(self, 500, {"detail": "DB error", "error": err})
             return json_response(self, 200, rows[0] if rows else {})
 
         if path == "/api/verify":
             key_value = body.get("key", "")
             hwid = body.get("hwid")
 
-            rows = supabase_request("GET", "keys", filters=[f"key=eq.{key_value}"])
+            rows, err = supabase_request("GET", "keys", filters=[f"key=eq.{key_value}"])
+
+            if err:
+                return json_response(self, 200, {
+                    "valid": False,
+                    "reason": "Database error",
+                    "debug_error": err,
+                    "debug_url": SUPABASE_URL,
+                    "debug_key_prefix": SUPABASE_KEY[:20] + "..." if SUPABASE_KEY else "MISSING"
+                })
+
             if not rows:
-                return json_response(self, 200, {"valid": False, "reason": "Key not found"})
+                return json_response(self, 200, {
+                    "valid": False,
+                    "reason": "Key not found",
+                    "debug_key_searched": key_value
+                })
 
             k = rows[0]
 
@@ -155,7 +186,7 @@ class handler(BaseHTTPRequestHandler):
             if "hwid" in body:
                 update_data["hwid"] = body["hwid"] if body["hwid"] else None
 
-            rows = supabase_request("PATCH", "keys", filters=[f"id=eq.{key_id}"], data=update_data)
+            rows, err = supabase_request("PATCH", "keys", filters=[f"id=eq.{key_id}"], data=update_data)
             return json_response(self, 200, rows[0] if rows else {})
 
         return json_response(self, 404, {"detail": "Not found"})
