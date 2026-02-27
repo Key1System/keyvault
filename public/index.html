@@ -379,8 +379,31 @@
     <h2>Create New Key</h2>
     <label>Label (optional)</label>
     <input type="text" id="new-label" placeholder="e.g. Pro User — John"/>
-    <label>Expires At (optional)</label>
-    <input type="datetime-local" id="new-expires"/>
+    <label>Expiry Duration</label>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <label style="display:flex;align-items:center;gap:6px;color:var(--accent);font-size:12px;text-transform:none;letter-spacing:0;margin:0;cursor:pointer;">
+        <input type="checkbox" id="new-lifetime" onchange="toggleLifetime()" style="width:auto;margin:0;padding:0;cursor:pointer;"/>
+        Lifetime (never expires)
+      </label>
+    </div>
+    <div id="duration-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div>
+        <label>Days</label>
+        <input type="number" id="new-days" placeholder="0" min="0" style="margin-bottom:0"/>
+      </div>
+      <div>
+        <label>Hours</label>
+        <input type="number" id="new-hours" placeholder="0" min="0" max="23" style="margin-bottom:0"/>
+      </div>
+      <div>
+        <label>Minutes</label>
+        <input type="number" id="new-minutes" placeholder="0" min="0" max="59" style="margin-bottom:0"/>
+      </div>
+      <div>
+        <label>Seconds</label>
+        <input type="number" id="new-seconds" placeholder="0" min="0" max="59" style="margin-bottom:0"/>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('create-modal')">Cancel</button>
       <button class="btn btn-green" onclick="createKey()">Generate Key</button>
@@ -545,19 +568,42 @@ function copyKey(key) {
   navigator.clipboard.writeText(key).then(() => toast('Key copied to clipboard', 'success'));
 }
 
+function toggleLifetime() {
+  const checked = document.getElementById('new-lifetime').checked;
+  document.getElementById('duration-fields').style.display = checked ? 'none' : 'grid';
+}
+
 function openCreateModal() {
   document.getElementById('new-label').value = '';
-  document.getElementById('new-expires').value = '';
+  document.getElementById('new-lifetime').checked = false;
+  document.getElementById('new-days').value = '';
+  document.getElementById('new-hours').value = '';
+  document.getElementById('new-minutes').value = '';
+  document.getElementById('new-seconds').value = '';
+  document.getElementById('duration-fields').style.display = 'grid';
   document.getElementById('create-modal').classList.add('show');
 }
 
 function createKey() {
   const label = document.getElementById('new-label').value;
-  const expires_at = document.getElementById('new-expires').value;
+  const lifetime = document.getElementById('new-lifetime').checked;
+
+  let expires_at = null;
+  if (!lifetime) {
+    const days = parseInt(document.getElementById('new-days').value) || 0;
+    const hours = parseInt(document.getElementById('new-hours').value) || 0;
+    const minutes = parseInt(document.getElementById('new-minutes').value) || 0;
+    const seconds = parseInt(document.getElementById('new-seconds').value) || 0;
+    const totalMs = ((days * 86400) + (hours * 3600) + (minutes * 60) + seconds) * 1000;
+    if (totalMs > 0) {
+      expires_at = new Date(Date.now() + totalMs).toISOString();
+    }
+  }
+
   fetch(`${API}/api/keys`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ label, expires_at: expires_at ? new Date(expires_at).toISOString() : null })
+    body: JSON.stringify({ label, expires_at })
   }).then(r => r.json()).then(k => {
     allKeys.unshift(k);
     renderTable();
