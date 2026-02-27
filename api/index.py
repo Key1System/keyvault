@@ -3,15 +3,36 @@ import json
 import os
 import random
 import string
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
-from supabase import create_client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "admin123")
 
-def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+def supabase_request(method, table, filters=None, data=None):
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    if filters:
+        url += "?" + "&".join(filters)
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print(f"Supabase error {e.code}: {error_body}")
+        return []
 
 def generate_key():
     chars = string.ascii_letters + string.digits
@@ -34,13 +55,12 @@ def read_body(handler):
     return json.loads(handler.rfile.read(length))
 
 def check_auth(handler):
-    pwd = handler.headers.get("x-dashboard-password", "")
-    return pwd == DASHBOARD_PASSWORD
+    return handler.headers.get("x-dashboard-password", "") == DASHBOARD_PASSWORD
 
 class handler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
-        pass  # suppress default logging
+        pass
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -52,13 +72,11 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
 
-        # GET /api/keys
         if path == "/api/keys":
             if not check_auth(self):
                 return json_response(self, 401, {"detail": "Unauthorized"})
-            db = get_supabase()
-            res = db.table("keys").select("*").order("created_at", desc=True).execute()
-            return json_response(self, 200, res.data)
+            rows = supabase_request("GET", "keys", filters=["order=created_at.desc"])
+            return json_response(self, 200, rows)
 
         return json_response(self, 404, {"detail": "Not found"})
 
@@ -66,11 +84,9 @@ class handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         body = read_body(self)
 
-        # POST /api/keys — create key
         if path == "/api/keys":
             if not check_auth(self):
                 return json_response(self, 401, {"detail": "Unauthorized"})
-            db = get_supabase()
             data = {
                 "key": generate_key(),
                 "label": body.get("label", ""),
@@ -80,19 +96,18 @@ class handler(BaseHTTPRequestHandler):
                 "last_seen": None,
                 "active_hwid": None,
             }
-            res = db.table("keys").insert(data).execute()
-            return json_response(self, 200, res.data[0])
+            rows = supabase_request("POST", "keys", data=data)
+            return json_response(self, 200, rows[0] if rows else {})
 
-        # POST /api/verify — verify key (public)
         if path == "/api/verify":
             key_value = body.get("key", "")
             hwid = body.get("hwid")
-            db = get_supabase()
-            res = db.table("keys").select("*").eq("key", key_value).execute()
-            if not res.data:
+
+            rows = supabase_request("GET", "keys", filters=[f"key=eq.{key_value}"])
+            if not rows:
                 return json_response(self, 200, {"valid": False, "reason": "Key not found"})
 
-            k = res.data[0]
+            k = rows[0]
 
             if not k["enabled"]:
                 return json_response(self, 200, {"valid": False, "reason": "Key is disabled"})
@@ -106,12 +121,12 @@ class handler(BaseHTTPRequestHandler):
                 if k["hwid"] and k["hwid"] != hwid:
                     return json_response(self, 200, {"valid": False, "reason": "HWID mismatch"})
                 if not k["hwid"]:
-                    db.table("keys").update({"hwid": hwid}).eq("id", k["id"]).execute()
+                    supabase_request("PATCH", "keys", filters=[f"id=eq.{k['id']}"], data={"hwid": hwid})
 
-            db.table("keys").update({
+            supabase_request("PATCH", "keys", filters=[f"id=eq.{k['id']}"], data={
                 "last_seen": datetime.now(timezone.utc).isoformat(),
                 "active_hwid": hwid or k["hwid"]
-            }).eq("id", k["id"]).execute()
+            })
 
             return json_response(self, 200, {
                 "valid": True,
@@ -126,7 +141,6 @@ class handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         body = read_body(self)
 
-        # PATCH /api/keys/<id>
         if path.startswith("/api/keys/"):
             if not check_auth(self):
                 return json_response(self, 401, {"detail": "Unauthorized"})
@@ -141,24 +155,19 @@ class handler(BaseHTTPRequestHandler):
             if "hwid" in body:
                 update_data["hwid"] = body["hwid"] if body["hwid"] else None
 
-            db = get_supabase()
-            res = db.table("keys").update(update_data).eq("id", key_id).execute()
-            if not res.data:
-                return json_response(self, 404, {"detail": "Key not found"})
-            return json_response(self, 200, res.data[0])
+            rows = supabase_request("PATCH", "keys", filters=[f"id=eq.{key_id}"], data=update_data)
+            return json_response(self, 200, rows[0] if rows else {})
 
         return json_response(self, 404, {"detail": "Not found"})
 
     def do_DELETE(self):
         path = self.path.split("?")[0]
 
-        # DELETE /api/keys/<id>
         if path.startswith("/api/keys/"):
             if not check_auth(self):
                 return json_response(self, 401, {"detail": "Unauthorized"})
             key_id = path.replace("/api/keys/", "")
-            db = get_supabase()
-            db.table("keys").delete().eq("id", key_id).execute()
+            supabase_request("DELETE", "keys", filters=[f"id=eq.{key_id}"])
             return json_response(self, 200, {"success": True})
 
         return json_response(self, 404, {"detail": "Not found"})
